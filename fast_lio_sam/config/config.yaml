@@ -18,6 +18,13 @@ icp:
 result:
   save_voxel_resolution: 0.3                # voxel resolution to save map in .pcd format and visualize in rviz
   save_map_pcd: true                        # Save result map in .pcd format, not voxelized and hence file size could be huge
-  save_map_bag: true                        # Save result map in .bag format, NOTE: this is used for FAST-LIO-Localization-QN (https://github.com/engcang/FAST-LIO-Localization-QN)
+  save_map_bag: false                        # Save result map in .bag format, NOTE: this is used for FAST-LIO-Localization-QN (https://github.com/engcang/FAST-LIO-Localization-QN)
   save_in_kitti_format: true                # Save result in KITTI format
   seq_name: "sequence"                      # sequence name for saving scans and corresponding poses
+
+gps:
+  use_gps: true                            # Use GPS factor in PGO
+  use_gps_elevation: false                  # Use GPS elevation data
+  gps_cov_thres: 2.0                        # Lower GPS covariance threshold to use GPS data
+  pose_cov_thres: 0.02                      # Higher pose covariance will use GPS data
+  gps_dist_thres: 5.0                       # GPS point distance threshold to use GPS data

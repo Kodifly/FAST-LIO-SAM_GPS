@@ -49,6 +49,11 @@
 #include "loop_closure.h"
 #include "pose_pcd.hpp"
 #include "utilities.hpp"
+///// GPS
+#include <sensor_msgs/NavSatFix.h>
+#include <gtsam/navigation/GPSFactor.h>
+#include <GeographicLib/Geocentric.hpp>
+#include <GeographicLib/LocalCartesian.hpp>
 
 namespace fs = std::filesystem;
 using namespace std::chrono;
@@ -96,6 +101,7 @@ private:
     ros::Publisher realtime_pose_pub_;
     ros::Publisher debug_src_pub_, debug_dst_pub_, debug_fine_aligned_pub_;
     ros::Subscriber sub_save_flag_;
+    ros::Subscriber sub_gps_;
     ros::Timer loop_timer_, vis_timer_;
     // odom, pcd sync, and save flag subscribers
     std::shared_ptr<message_filters::Synchronizer<odom_pcd_sync_pol>> sub_odom_pcd_sync_ = nullptr;
@@ -103,6 +109,14 @@ private:
     std::shared_ptr<message_filters::Subscriber<sensor_msgs::PointCloud2>> sub_pcd_ = nullptr;
     ///// Loop closure
     std::shared_ptr<LoopClosure> loop_closure_;
+    ///// GPS
+    bool use_gps = false;
+    std::deque<nav_msgs::Odometry> gps_odom_queue_;
+    ros::Publisher pub_gps_odom_;
+    GeographicLib::LocalCartesian gps_trans_;
+    Eigen::MatrixXd pose_covariance_;
+    float gps_cov_thres, pose_cov_thres, gps_dist_thres;
+    bool use_gps_elevation = false;
 
 public:
     explicit FastLioSam(const ros::NodeHandle &n_private);
@@ -114,6 +128,8 @@ private:
     bool checkIfKeyframe(const PosePcd &pose_pcd_in, const PosePcd &latest_pose_pcd);
     visualization_msgs::Marker getLoopMarkers(const gtsam::Values &corrected_esti_in);
     // cb
+    void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr &msg);
+    void add_gps_factor(const PosePcd &current_frame);
     void odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                          const sensor_msgs::PointCloud2ConstPtr &pcd_msg);
     void saveFlagCallback(const std_msgs::String::ConstPtr &msg);

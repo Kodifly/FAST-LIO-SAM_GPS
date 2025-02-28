@@ -25,6 +25,13 @@ FastLioSam::FastLioSam(const ros::NodeHandle &n_private):
     nh_.param<bool>("/result/save_map_pcd", save_map_pcd_, false);
     nh_.param<bool>("/result/save_map_bag", save_map_bag_, false);
     nh_.param<bool>("/result/save_in_kitti_format", save_in_kitti_format_, false);
+    /* GPS */
+    nh_.param<bool>("/gps/use_gps", use_gps, false);
+    nh_.param<bool>("/gps/use_gps_elevation", use_gps_elevation, false);
+    nh_.param<float>("/gps/gps_cov_thres", gps_cov_thres, 2.0);
+    nh_.param<float>("/gps/pose_cov_thres", pose_cov_thres, 0.02);
+    nh_.param<float>("/gps/gps_dist_thres", gps_dist_thres, 5.0);
+    /* sequence name */
     nh_.param<std::string>("/result/seq_name", seq_name_, "");
     /* Loop closure */
     loop_closure_.reset(new LoopClosure(lc_config));
@@ -36,7 +43,7 @@ FastLioSam::FastLioSam(const ros::NodeHandle &n_private):
     /* ROS things */
     odom_path_.header.frame_id = map_frame_;
     corrected_path_.header.frame_id = map_frame_;
-    package_path_ = ros::package::getPath("fast_lio_sam_qn");
+    package_path_ = ros::package::getPath("fast_lio_sam");
     /* publishers */
     odom_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/ori_odom", 10, true);
     path_pub_ = nh_.advertise<nav_msgs::Path>("/ori_path", 10, true);
@@ -49,16 +56,132 @@ FastLioSam::FastLioSam(const ros::NodeHandle &n_private):
     debug_src_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/src", 10, true);
     debug_dst_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/dst", 10, true);
     debug_fine_aligned_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/aligned", 10, true);
+    pub_gps_odom_ = nh_.advertise<nav_msgs::Odometry>("/gps/odom", 10);
     /* subscribers */
     sub_odom_ = std::make_shared<message_filters::Subscriber<nav_msgs::Odometry>>(nh_, "/Odometry", 10);
     sub_pcd_ = std::make_shared<message_filters::Subscriber<sensor_msgs::PointCloud2>>(nh_, "/cloud_registered", 10);
     sub_odom_pcd_sync_ = std::make_shared<message_filters::Synchronizer<odom_pcd_sync_pol>>(odom_pcd_sync_pol(10), *sub_odom_, *sub_pcd_);
     sub_odom_pcd_sync_->registerCallback(boost::bind(&FastLioSam::odomPcdCallback, this, _1, _2));
     sub_save_flag_ = nh_.subscribe("/save_dir", 1, &FastLioSam::saveFlagCallback, this);
+    sub_gps_ = nh_.subscribe<sensor_msgs::NavSatFix>("/gps/fix", 10, &FastLioSam::gpsCallback, this);
     /* Timers */
     loop_timer_ = nh_.createTimer(ros::Duration(1 / loop_update_hz), &FastLioSam::loopTimerFunc, this);
     vis_timer_ = nh_.createTimer(ros::Duration(1 / vis_hz), &FastLioSam::visTimerFunc, this);
     ROS_INFO("Main class, starting node...");
+}
+
+void FastLioSam::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr &gps_msg)
+{
+    // ROS_INFO("GPS: %f, %f", msg->latitude, msg->longitude);
+    if (gps_msg->status.status != 0)
+    return;
+
+    Eigen::Vector3d trans_local_;
+    static bool first_gps = false;
+    if (!first_gps) {
+        first_gps = true;
+        gps_trans_.Reset(gps_msg->latitude, gps_msg->longitude, gps_msg->altitude);
+    }
+
+    gps_trans_.Forward(gps_msg->latitude, gps_msg->longitude, gps_msg->altitude, trans_local_[0], trans_local_[1], trans_local_[2]);
+
+    nav_msgs::Odometry gps_odom;
+    gps_odom.header = gps_msg->header;
+    gps_odom.header.frame_id = map_frame_;
+    gps_odom.pose.pose.position.x = trans_local_[0];
+    gps_odom.pose.pose.position.y = trans_local_[1];
+    gps_odom.pose.pose.position.z = trans_local_[2];
+    gps_odom.pose.covariance[0] = gps_msg->position_covariance[0];
+    gps_odom.pose.covariance[7] = gps_msg->position_covariance[4];
+    gps_odom.pose.covariance[14] = gps_msg->position_covariance[8];
+    gps_odom.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(0.0, 0.0, 0.0);
+    pub_gps_odom_.publish(gps_odom);
+    gps_odom_queue_.push_back(gps_odom);
+}
+
+void FastLioSam::add_gps_factor(const PosePcd &current_frame)
+{
+    if (gps_odom_queue_.empty())
+    return;
+
+    // wait for system initialized and settles down
+    if (keyframes_.empty())
+        return;
+    else
+    {
+        if ((keyframes_.front().pose_corrected_eig_.block<3, 1>(0, 3) - keyframes_.back().pose_corrected_eig_.block<3, 1>(0, 3)).norm() < 5.0)
+            return;
+    }
+
+    // pose covariance small, no need to correct
+    if (pose_covariance_(3,3) < pose_cov_thres && pose_covariance_(4,4) < pose_cov_thres)
+        return;
+
+    // last gps position
+    static PointType last_gps_point;
+
+    while (!gps_odom_queue_.empty())
+    {
+        if (gps_odom_queue_.front().header.stamp.toSec() < current_frame.timestamp_ - 0.05)
+        {
+            // message too old
+            gps_odom_queue_.pop_front();
+        }
+        else if (gps_odom_queue_.front().header.stamp.toSec() > current_frame.timestamp_ + 0.05)
+        {
+            // message too new
+            break;
+        }
+        else
+        {
+            nav_msgs::Odometry this_gps = gps_odom_queue_.front();
+            gps_odom_queue_.pop_front();
+
+            // GPS too noisy, skip
+            float noise_x = this_gps.pose.covariance[0];
+            float noise_y = this_gps.pose.covariance[7];
+            float noise_z = this_gps.pose.covariance[14];
+            std::cout << "GPS noise: " << noise_x << ", " << noise_y << ", " << noise_z << std::endl;
+            if (noise_x > gps_cov_thres || noise_y > gps_cov_thres)
+                continue;
+
+            float gps_x = this_gps.pose.pose.position.x;
+            float gps_y = this_gps.pose.pose.position.y;
+            float gps_z = this_gps.pose.pose.position.z;
+            if (!use_gps_elevation)
+            {
+                gps_z = current_frame.pose_corrected_eig_(2,3); // use slam z
+                noise_z = 0.01;
+            }
+
+            // GPS not properly initialized (0,0,0)
+            if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6)
+                continue;
+
+            // Add GPS every a few meters
+            PointType cur_gps_point;
+            cur_gps_point.x = gps_x;
+            cur_gps_point.y = gps_y;
+            cur_gps_point.z = gps_z;
+            float gps_point_dist = sqrt((cur_gps_point.x - last_gps_point.x) * (cur_gps_point.x - last_gps_point.x) +
+                                        (cur_gps_point.y - last_gps_point.y) * (cur_gps_point.y - last_gps_point.y) +
+                                        (cur_gps_point.z - last_gps_point.z) * (cur_gps_point.z - last_gps_point.z));
+            if (gps_point_dist < gps_dist_thres)
+                continue;
+            else
+                last_gps_point = cur_gps_point;
+
+            gtsam::Vector Vector3(3);
+            Vector3 << std::max(noise_x, 1.0f), std::max(noise_y, 1.0f), std::max(noise_z, 1.0f);
+            gtsam::noiseModel::Diagonal::shared_ptr gps_noise = gtsam::noiseModel::Diagonal::Variances(Vector3);
+            gtsam::GPSFactor gps_factor(current_frame.idx_, gtsam::Point3(gps_x, gps_y, gps_z), gps_noise);
+            std::lock_guard<std::mutex> lock(graph_mutex_);
+            gtsam_graph_.add(gps_factor);
+
+            loop_added_flag_ = true;
+            break;
+        }
+    }
 }
 
 void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
@@ -66,12 +189,12 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
 {
     Eigen::Matrix4d last_odom_tf;
     last_odom_tf = current_frame_.pose_eig_;                              // to calculate delta
-    current_frame_ = PosePcd(*odom_msg, *pcd_msg, current_keyframe_idx_); // to be checked if keyframe or not
+    current_frame_ = PosePcd(*odom_msg, *pcd_msg, current_keyframe_idx_); // to be checked if keyframe or not, pcd transformed from world frame to LiDAR frame
     high_resolution_clock::time_point t1 = high_resolution_clock::now();
     {
         //// 1. realtime pose = last corrected odom * delta (last -> current)
         std::lock_guard<std::mutex> lock(realtime_pose_mutex_);
-        odom_delta_ = odom_delta_ * last_odom_tf.inverse() * current_frame_.pose_eig_;
+        odom_delta_ = odom_delta_ * last_odom_tf.inverse() * current_frame_.pose_eig_; // ?
         current_frame_.pose_corrected_eig_ = last_corrected_pose_ * odom_delta_;
         realtime_pose_pub_.publish(poseEigToPoseStamped(current_frame_.pose_corrected_eig_, map_frame_));
         broadcaster_.sendTransform(tf::StampedTransform(poseEigToROSTf(current_frame_.pose_corrected_eig_),
@@ -119,6 +242,11 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                                                                     odom_noise));
                 init_esti_.insert(current_keyframe_idx_, pose_to);
             }
+            // 2-4, if so, add gps factor
+            if (use_gps)
+            {
+                add_gps_factor(current_frame_);
+            }
             current_keyframe_idx_++;
 
             //// 3. vis
@@ -152,6 +280,8 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                 std::lock_guard<std::mutex> lock(realtime_pose_mutex_);
                 corrected_esti_ = isam_handler_->calculateEstimate();
                 last_corrected_pose_ = gtsamPoseToPoseEig(corrected_esti_.at<gtsam::Pose3>(corrected_esti_.size() - 1));
+                pose_covariance_ = isam_handler_->marginalCovariance(corrected_esti_.size() - 1);
+                std::cout << "Pose covariance: " << std::endl << pose_covariance_ << std::endl << std::endl;
                 odom_delta_ = Eigen::Matrix4d::Identity();
             }
             // correct poses in keyframes

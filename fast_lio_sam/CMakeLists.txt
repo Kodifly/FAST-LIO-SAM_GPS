@@ -26,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(PCL REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
+find_package(GeographicLib REQUIRED)
 if(PCL_FOUND)
   message(WARNING "PCL_VER: ${PCL_VERSION}, and PCL_DIR: ${PCL_INCLUDE_DIRS}")
 endif()
@@ -34,6 +35,9 @@ if(Eigen3_FOUND)
 endif()
 if(GTSAM_FOUND)
   message(WARNING "GTSAM_VER: ${GTSAM_VERSION}, and GTSAM DIR: ${GTSAM_INCLUDE_DIR}")
+endif()
+if(GeographicLib_FOUND)
+  message(WARNING "GeographicLib_VER: ${GeographicLib_VERSION}, and GeographicLib DIR: ${GeographicLib_INCLUDE_DIR}")
 endif()
 
 catkin_package() #this automatically adds/installs the results of build
@@ -53,7 +57,7 @@ include_directories(
 ### main
 set(COMMON_LIBS ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${EIGEN3_LIBS} gtsam)
 add_library(${PROJECT_NAME}_modules src/loop_closure.cpp src/fast_lio_sam.cpp)
-target_link_libraries(${PROJECT_NAME}_modules ${COMMON_LIBS})
+target_link_libraries(${PROJECT_NAME}_modules ${COMMON_LIBS} ${GeographicLib_LIBRARIES})
 
 add_executable(${PROJECT_NAME}_node src/main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${COMMON_LIBS} ${PROJECT_NAME}_modules)

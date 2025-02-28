@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 
     FastLioSam fast_lio_sam_(nh_private);
 
-    ros::AsyncSpinner spinner(4); // Use multi threads
+    ros::AsyncSpinner spinner(5); // Use multi threads
     spinner.start();
     ros::waitForShutdown();
 
