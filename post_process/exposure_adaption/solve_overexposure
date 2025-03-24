@@ -1,0 +1,68 @@
+import cv2
+import numpy as np
+import os
+from glob import glob
+
+def recover_overexposure(image):
+    """
+    Recover overexposed regions in an image by reducing brightness and blending.
+    """
+    # Convert the image to HSV color space
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv_image)
+
+    # Create a mask for overexposed regions (pixels with high brightness)
+    overexposed_mask = (v > 200).astype(np.uint8) * 255  # Pixels with V > 200 are considered overexposed
+
+    # Dilate the mask slightly to include neighboring pixels
+    kernel = np.ones((5, 5), np.uint8)
+    overexposed_mask = cv2.dilate(overexposed_mask, kernel, iterations=1)
+
+    # Blur the overexposed regions to smooth them out
+    blurred_v = cv2.GaussianBlur(v, (15, 15), 0)
+
+    # Blend the original V channel with the blurred version using the mask
+    v_recovered = np.where(overexposed_mask > 0, blurred_v, v)
+
+    # Merge the adjusted V channel back with H and S channels
+    recovered_hsv = cv2.merge([h, s, v_recovered])
+
+    # Convert back to BGR color space
+    recovered_image = cv2.cvtColor(recovered_hsv, cv2.COLOR_HSV2BGR)
+    return recovered_image
+
+def batch_process_images(input_folder, output_folder):
+    """
+    Process all images in the input folder, recover overexposure, and save corrected images.
+    """
+    # Create the output folder if it doesn't exist
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # Get all image files in the input folder and sort them alphabetically
+    image_paths = sorted(
+        glob(os.path.join(input_folder, "*.[jJ][pP][gG]")) + 
+        glob(os.path.join(input_folder, "*.[pP][nN][gG]"))
+    )
+
+    # Process each image
+    for i, image_path in enumerate(image_paths, start=1):
+        # Load the image
+        image = cv2.imread(image_path)
+        if image is None:
+            print(f"Error: Unable to load image {image_path}. Skipping...")
+            continue
+
+        # Recover overexposure
+        recovered_image = recover_overexposure(image)
+
+        # Save the recovered image
+        output_path = os.path.join(output_folder, os.path.basename(image_path))
+        cv2.imwrite(output_path, recovered_image)
+        print(f"Processed image {i}/{len(image_paths)}: Saved to {output_path}")
+
+# Example usage
+input_folder = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/undistorted_image_5_params"
+output_folder = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/recovered_image"
+
+batch_process_images(input_folder, output_folder)

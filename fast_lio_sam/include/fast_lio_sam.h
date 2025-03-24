@@ -100,6 +100,7 @@ private:
     ros::Publisher corrected_current_pcd_pub_, corrected_pcd_map_pub_, loop_detection_pub_;
     ros::Publisher realtime_pose_pub_;
     ros::Publisher debug_src_pub_, debug_dst_pub_, debug_fine_aligned_pub_;
+    ros::Publisher debug_intensity_seed_points_pub_, debug_noise_points_pub_, debug_map_for_clustering_pub_, debug_signboards_map_pub_, debug_remained_map_pub_;
     ros::Subscriber sub_save_flag_;
     ros::Subscriber sub_gps_;
     ros::Timer loop_timer_, vis_timer_;
@@ -117,6 +118,17 @@ private:
     Eigen::MatrixXd pose_covariance_;
     float gps_cov_thres, pose_cov_thres, gps_dist_thres;
     bool use_gps_elevation = false;
+    ///// denoise
+    bool denoise_en = false;
+    float seed_thres = 2800.0;
+    float denoise_radius = 0.5;
+    float cluster_seed_radius = 1.0;
+    float noise_thres = 2700.0;
+    int MeanK = 50;
+    float StddevMulThresh = 1.0;
+    pcl::PointCloud<pcl::PointXYZI> map_for_clustering;
+    int map_for_clustering_size_thres = 10000;
+    pcl::PointCloud<pcl::PointXYZI> signboards_map;
 
 public:
     explicit FastLioSam(const ros::NodeHandle &n_private);
@@ -130,6 +142,10 @@ private:
     // cb
     void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr &msg);
     void add_gps_factor(const PosePcd &current_frame);
+    pcl::PointCloud<pcl::PointXYZI> extract_intensity_points(const pcl::PointCloud<pcl::PointXYZI>& ori_pcd);
+    pcl::PointCloud<pcl::PointXYZI> denoise_and_extract_clustering_seed_points(const pcl::PointCloud<pcl::PointXYZI>& seed_cloud, pcl::PointCloud<pcl::PointXYZI>& ori_pcd, \
+                                                        pcl::PointCloud<pcl::PointXYZI>& map_for_clustering);
+    pcl::PointCloud<pcl::PointXYZI> clustering_and_denoise(const pcl::PointCloud<pcl::PointXYZI> &map_for_clustering);
     void odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                          const sensor_msgs::PointCloud2ConstPtr &pcd_msg);
     void saveFlagCallback(const std_msgs::String::ConstPtr &msg);

@@ -22,6 +22,8 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   message_filters
+  cv_bridge
+  image_transport
 )
 find_package(PCL REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -61,3 +63,6 @@ target_link_libraries(${PROJECT_NAME}_modules ${COMMON_LIBS} ${GeographicLib_LIB
 
 add_executable(${PROJECT_NAME}_node src/main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${COMMON_LIBS} ${PROJECT_NAME}_modules)
+
+add_executable(${PROJECT_NAME}_sensor_recorder src/sensor_recorder.cpp)
+target_link_libraries(${PROJECT_NAME}_sensor_recorder ${COMMON_LIBS} ${PROJECT_NAME}_modules)

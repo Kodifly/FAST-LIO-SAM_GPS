@@ -4,7 +4,7 @@ basic:
   vis_hz: 1.0                               # visualize Hz
 
 keyframe:
-  keyframe_threshold: 1.5                   # unit [meter] every this distance, generate keyframe
+  keyframe_threshold: 0                   # unit [meter] every this distance, generate keyframe
   num_submap_keyframes: 5                   # how many subkeyframes are merged to ICP with current keyframe (closest-this ~ closest+this, if exists)
 
 loop:
@@ -19,12 +19,25 @@ result:
   save_voxel_resolution: 0.3                # voxel resolution to save map in .pcd format and visualize in rviz
   save_map_pcd: true                        # Save result map in .pcd format, not voxelized and hence file size could be huge
   save_map_bag: false                        # Save result map in .bag format, NOTE: this is used for FAST-LIO-Localization-QN (https://github.com/engcang/FAST-LIO-Localization-QN)
-  save_in_kitti_format: true                # Save result in KITTI format
-  seq_name: "sequence"                      # sequence name for saving scans and corresponding poses
+  save_in_kitti_format: false                # Save result in KITTI format
+  seq_name: "isds_sample_data"                      # sequence name for saving scans and corresponding poses
 
 gps:
-  use_gps: true                            # Use GPS factor in PGO
+  use_gps: false                            # Use GPS factor in PGO
   use_gps_elevation: false                  # Use GPS elevation data
   gps_cov_thres: 2.0                        # Lower GPS covariance threshold to use GPS data
   pose_cov_thres: 0.02                      # Higher pose covariance will use GPS data
   gps_dist_thres: 5.0                       # GPS point distance threshold to use GPS data
+
+denoise:
+  denoise_en: true                         # Enable denoising
+  seed_thres: 2800.0
+  denoise_radius: 1.0
+  cluster_seed_radius: 1.0
+  noise_thres: 2700.0
+  map_for_clustering_size_thres: 10000
+  # Statistical outlier removal
+  sor:
+    MeanK: 50
+    StddevMulThresh: 1.0                    # Threshold for standard deviation
+               

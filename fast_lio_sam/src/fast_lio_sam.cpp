@@ -1,4 +1,6 @@
 #include "fast_lio_sam.h"
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 
 FastLioSam::FastLioSam(const ros::NodeHandle &n_private):
     nh_(n_private)
@@ -31,6 +33,15 @@ FastLioSam::FastLioSam(const ros::NodeHandle &n_private):
     nh_.param<float>("/gps/gps_cov_thres", gps_cov_thres, 2.0);
     nh_.param<float>("/gps/pose_cov_thres", pose_cov_thres, 0.02);
     nh_.param<float>("/gps/gps_dist_thres", gps_dist_thres, 5.0);
+    /* denoise */
+    nh_.param<bool>("/denoise/denoise_en", denoise_en, false);
+    nh_.param<float>("/denoise/seed_thres", seed_thres, 2800.0);
+    nh_.param<float>("/denoise/denoise_radius", denoise_radius, 0.5);
+    nh_.param<float>("/denoise/cluster_seed_radius", cluster_seed_radius, 1.0);
+    nh_.param<float>("/denoise/noise_thres", noise_thres, 2700.0);
+    nh_.param<int>("/denoise/map_for_clustering_size_thres", map_for_clustering_size_thres, 10000);
+    nh_.param<int>("/denoise/sor/MeanK", MeanK, 50);
+    nh_.param<float>("/denoise/sor/StddevMulThresh", StddevMulThresh, 1.0);
     /* sequence name */
     nh_.param<std::string>("/result/seq_name", seq_name_, "");
     /* Loop closure */
@@ -50,12 +61,17 @@ FastLioSam::FastLioSam(const ros::NodeHandle &n_private):
     corrected_odom_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/corrected_odom", 10, true);
     corrected_path_pub_ = nh_.advertise<nav_msgs::Path>("/corrected_path", 10, true);
     corrected_pcd_map_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/corrected_map", 10, true);
-    corrected_current_pcd_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/corrected_current_pcd", 10, true);
+    corrected_current_pcd_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/corrected_current_pcd", 10, true); // visualize in rviz
     loop_detection_pub_ = nh_.advertise<visualization_msgs::Marker>("/loop_detection", 10, true);
     realtime_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/pose_stamped", 10);
     debug_src_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/src", 10, true);
     debug_dst_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/dst", 10, true);
     debug_fine_aligned_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/aligned", 10, true);
+    debug_intensity_seed_points_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/seed_intensity_points", 10, true);
+    debug_noise_points_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/noise_points", 10, true);
+    debug_map_for_clustering_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/map_for_clustering", 10, true);
+    debug_signboards_map_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/denoised_map", 10, true);
+    debug_remained_map_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("/remained_map", 10, true);
     pub_gps_odom_ = nh_.advertise<nav_msgs::Odometry>("/gps/odom", 10);
     /* subscribers */
     sub_odom_ = std::make_shared<message_filters::Subscriber<nav_msgs::Odometry>>(nh_, "/Odometry", 10);
@@ -68,6 +84,8 @@ FastLioSam::FastLioSam(const ros::NodeHandle &n_private):
     loop_timer_ = nh_.createTimer(ros::Duration(1 / loop_update_hz), &FastLioSam::loopTimerFunc, this);
     vis_timer_ = nh_.createTimer(ros::Duration(1 / vis_hz), &FastLioSam::visTimerFunc, this);
     ROS_INFO("Main class, starting node...");
+    /* denoise */
+    map_for_clustering.clear();
 }
 
 void FastLioSam::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr &gps_msg)
@@ -184,6 +202,111 @@ void FastLioSam::add_gps_factor(const PosePcd &current_frame)
     }
 }
 
+pcl::PointCloud<pcl::PointXYZI> FastLioSam::extract_intensity_points(const pcl::PointCloud<pcl::PointXYZI>& ori_pcd)
+{
+    pcl::PointCloud<pcl::PointXYZI> intensity_cloud;
+    for (const auto& pt : ori_pcd)
+    {
+        if (pt.intensity > seed_thres)
+        {
+            intensity_cloud.push_back(pt);
+        }
+    }
+    return intensity_cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZI> FastLioSam::denoise_and_extract_clustering_seed_points(const pcl::PointCloud<pcl::PointXYZI>& seed_cloud, pcl::PointCloud<pcl::PointXYZI>& ori_pcd, \
+                                                                    pcl::PointCloud<pcl::PointXYZI>& map_for_clustering)
+{
+    pcl::PointCloud<pcl::PointXYZI> noise_cloud;
+    pcl::PointCloud<pcl::PointXYZI> ori_cloud_label = ori_pcd;
+    pcl::KdTreeFLANN<pcl::PointXYZI> denoise_kdtree, cluster_seed_kdtree;
+    denoise_kdtree.setInputCloud(ori_cloud_label.makeShared());
+    cluster_seed_kdtree.setInputCloud(ori_cloud_label.makeShared());
+    std::vector<int> denoise_id, cluster_seed_id;
+    std::vector<float> denoise_dist, cluster_seed_dist;
+
+    for (const auto& pt : seed_cloud)
+    {
+        // intensity-based denoising
+        if (denoise_kdtree.radiusSearch(pt, denoise_radius, denoise_id, denoise_dist) > 0)
+        {
+            for (uint j = 0; j < denoise_id.size(); j++)
+            {
+                if (ori_cloud_label.points[denoise_id[j]].intensity == 0.0) // already labeled as noise
+                    continue;
+                if (ori_cloud_label.points[denoise_id[j]].intensity < noise_thres)
+                {
+                    noise_cloud.push_back(ori_cloud_label.points[denoise_id[j]]);
+                    ori_cloud_label.points[denoise_id[j]].intensity = 0.0;
+                }
+            }
+        }
+
+        // extract clustering seed points
+        if (cluster_seed_kdtree.radiusSearch(pt, cluster_seed_radius, cluster_seed_id, cluster_seed_dist) > 0)
+        {
+            for (uint j = 0; j < cluster_seed_id.size(); j++)
+            {
+                if (ori_cloud_label.points[cluster_seed_id[j]].intensity != 0.0)
+                {
+                    map_for_clustering.push_back(ori_cloud_label.points[cluster_seed_id[j]]);
+                    ori_cloud_label.points[cluster_seed_id[j]].intensity = 0.0;
+                }
+            }
+        }
+    }
+    std::cout << "Map for clustering size: " << map_for_clustering.size() << std::endl;
+
+    // replace original pcd with remained points
+    pcl::PointCloud<pcl::PointXYZI> remained_cloud;
+    for (const auto& pt : ori_cloud_label)
+    {
+        if (pt.intensity != 0.0)
+        {
+            remained_cloud.push_back(pt);
+        }
+    }
+    ori_pcd.clear();
+    ori_pcd = remained_cloud;
+    return noise_cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZI> FastLioSam::clustering_and_denoise(const pcl::PointCloud<pcl::PointXYZI> &map_for_clustering)
+{
+    // Apply Statistical Outlier Removal (SOR)
+    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    pcl::StatisticalOutlierRemoval<pcl::PointXYZI> sor;
+    sor.setInputCloud(map_for_clustering.makeShared());
+    sor.setMeanK(MeanK); // Number of nearest neighbors to analyze
+    sor.setStddevMulThresh(StddevMulThresh); // Threshold for standard deviation
+    sor.filter(*filtered_cloud);
+    std::cout << "before SOR: " << map_for_clustering.size() << ", after SOR: " << filtered_cloud->size() << std::endl;
+
+    // pcl::PointCloud<pcl::PointXYZI> denoised_map;
+    // pcl::search::KdTree<pcl::PointXYZI>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZI>);
+    // kdtree->setInputCloud(map_for_clustering.makeShared());
+    // std::vector<pcl::PointIndices> cluster_indices;
+    // pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+    // ec.setClusterTolerance(0.5);
+    // ec.setMinClusterSize(10);
+    // ec.setMaxClusterSize(25000);
+    // ec.setSearchMethod(kdtree);
+    // ec.setInputCloud(map_for_clustering.makeShared());
+    // ec.extract(cluster_indices);
+    // for (const auto &cluster : cluster_indices)
+    // {
+    //     if (cluster.indices.size() > 100)
+    //     {
+    //         for (const auto &idx : cluster.indices)
+    //         {
+    //             denoised_map.push_back(map_for_clustering.points[idx]);
+    //         }
+    //     }
+    // }
+    return *filtered_cloud;
+}
+
 void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                                  const sensor_msgs::PointCloud2ConstPtr &pcd_msg)
 {
@@ -202,7 +325,29 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                                                         map_frame_,
                                                         "robot"));
     }
-    corrected_current_pcd_pub_.publish(pclToPclRos(transformPcd(current_frame_.pcd_, current_frame_.pose_corrected_eig_), map_frame_));
+    pcl::PointCloud<pcl::PointXYZI> ori_cloud = transformPcd(current_frame_.pcd_, current_frame_.pose_corrected_eig_);
+    corrected_current_pcd_pub_.publish(pclToPclRos(ori_cloud, map_frame_));
+
+    if (denoise_en)
+    {
+        auto intensity_seed_points = extract_intensity_points(ori_cloud);
+        debug_intensity_seed_points_pub_.publish(pclToPclRos(intensity_seed_points, map_frame_));
+        
+        auto noise_points = denoise_and_extract_clustering_seed_points(intensity_seed_points, ori_cloud, map_for_clustering);
+        debug_noise_points_pub_.publish(pclToPclRos(noise_points, map_frame_));
+        debug_map_for_clustering_pub_.publish(pclToPclRos(map_for_clustering, map_frame_));
+
+        // replace current_frame_.pcd_ with remained points
+        current_frame_.pcd_ = transformPcd_inverse(ori_cloud, current_frame_.pose_corrected_eig_);
+        debug_remained_map_pub_.publish(pclToPclRos(current_frame_.pcd_, map_frame_));
+
+        if (map_for_clustering.size() > map_for_clustering_size_thres)
+        {
+            signboards_map += clustering_and_denoise(map_for_clustering);
+            debug_signboards_map_pub_.publish(pclToPclRos(signboards_map, map_frame_));
+            map_for_clustering.clear();
+        }
+    }
 
     if (!is_initialized_) //// init only once
     {
@@ -281,7 +426,7 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                 corrected_esti_ = isam_handler_->calculateEstimate();
                 last_corrected_pose_ = gtsamPoseToPoseEig(corrected_esti_.at<gtsam::Pose3>(corrected_esti_.size() - 1));
                 pose_covariance_ = isam_handler_->marginalCovariance(corrected_esti_.size() - 1);
-                std::cout << "Pose covariance: " << std::endl << pose_covariance_ << std::endl << std::endl;
+                // std::cout << "Pose covariance: " << std::endl << pose_covariance_ << std::endl << std::endl;
                 odom_delta_ = Eigen::Matrix4d::Identity();
             }
             // correct poses in keyframes
@@ -434,6 +579,7 @@ void FastLioSam::visTimerFunc(const ros::TimerEvent &event)
 void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
 {
     std::string save_dir = msg->data != "" ? msg->data : package_path_;
+    std::cout << "Save directory: " << save_dir << std::endl;
 
     // save scans as individual pcd files and poses in KITTI format
     // Delete the scans folder if it exists and create a new one
@@ -504,6 +650,7 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
 
     if (save_map_pcd_)
     {
+        ROS_INFO("\033[32;1mStart to save map\033[0m");
         pcl::PointCloud<PointType>::Ptr corrected_map(new pcl::PointCloud<PointType>());
         corrected_map->reserve(keyframes_[0].pcd_.size() * keyframes_.size()); // it's an approximated size
         {
@@ -513,8 +660,10 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
                 *corrected_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
             }
         }
-        const auto &voxelized_map = voxelizePcd(corrected_map, voxel_res_);
-        pcl::io::savePCDFileASCII<PointType>(seq_directory + "/" + seq_name_ + "_map.pcd", *voxelized_map);
+        *corrected_map += signboards_map;
+        // const auto &voxelized_map = voxelizePcd(corrected_map, voxel_res_);
+        // pcl::io::savePCDFileASCII<PointType>(seq_directory + "/" + seq_name_ + "_map.pcd", *voxelized_map);
+        pcl::io::savePCDFileASCII<PointType>(seq_directory + "/" + seq_name_ + "_map.pcd", *corrected_map);
         ROS_INFO("\033[32;1mAccumulated map cloud saved in .pcd format\033[0m");
     }
 }

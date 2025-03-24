@@ -141,6 +141,20 @@ inline pcl::PointCloud<T> transformPcd(const pcl::PointCloud<T> &cloud_in,
     return pcl_out;
 }
 
+template<typename T>
+inline pcl::PointCloud<T> transformPcd_inverse(const pcl::PointCloud<T> &cloud_in,
+                                       const Eigen::Matrix4d &pose_tf)
+{
+    if (cloud_in.size() == 0)
+    {
+        return cloud_in;
+    }
+    pcl::PointCloud<T> pcl_out = cloud_in;
+    Eigen::Matrix4d pose_tf_inv = pose_tf.inverse();
+    pcl::transformPointCloud(cloud_in, pcl_out, pose_tf_inv);
+    return pcl_out;
+}
+
 inline pcl::PointCloud<pcl::PointXYZI>::Ptr voxelizePcd(const pcl::PointCloud<pcl::PointXYZI> &pcd_in,
                                                         const float voxel_res)
 {

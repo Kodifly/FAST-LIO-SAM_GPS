@@ -1,0 +1,113 @@
+import cv2
+import numpy as np
+import os
+from glob import glob
+
+def detect_exposure(image):
+    """
+    Detect if the image is overexposed, underexposed, or well-exposed.
+    Returns:
+        str: 'overexposed', 'underexposed', or 'well-exposed'
+    """
+    # Convert to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Calculate histogram
+    hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
+
+    # Normalize histogram
+    hist = hist / hist.sum()
+
+    # Analyze histogram
+    low_pixel_ratio = hist[:50].sum()  # Pixels in dark regions
+    high_pixel_ratio = hist[200:].sum()  # Pixels in bright regions
+
+    if high_pixel_ratio > 0.3:  # More than 30% pixels are very bright
+        return "overexposed"
+    elif low_pixel_ratio > 0.3:  # More than 30% pixels are very dark
+        return "underexposed"
+    else:
+        return "well-exposed"
+
+def correct_overexposure(image):
+    """
+    Correct overexposed images by reducing brightness.
+    """
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv_image)
+
+    # Apply histogram equalization to the value channel
+    v_equalized = cv2.equalizeHist(v)
+
+    # Merge channels back
+    corrected_hsv = cv2.merge([h, s, v_equalized])
+    corrected_image = cv2.cvtColor(corrected_hsv, cv2.COLOR_HSV2BGR)
+
+    # Apply gamma correction to further reduce brightness
+    gamma = 0.8
+    corrected_image = np.clip(((corrected_image / 255.0) ** gamma) * 255.0, 0, 255).astype(np.uint8)
+    return corrected_image
+
+def correct_underexposure(image):
+    """
+    Correct underexposed images by increasing brightness.
+    """
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv_image)
+
+    # Stretch the value channel to increase brightness
+    min_val = np.percentile(v, 5)
+    max_val = np.percentile(v, 95)
+    v_stretched = np.clip((v - min_val) / (max_val - min_val) * 255, 0, 255).astype(np.uint8)
+
+    # Merge channels back
+    corrected_hsv = cv2.merge([h, s, v_stretched])
+    corrected_image = cv2.cvtColor(corrected_hsv, cv2.COLOR_HSV2BGR)
+
+    # Apply gamma correction to further increase brightness
+    gamma = 1.2
+    corrected_image = np.clip(((corrected_image / 255.0) ** gamma) * 255.0, 0, 255).astype(np.uint8)
+    return corrected_image
+
+def process_images_in_sequence(input_folder, output_folder):
+    """
+    Process all images in the input folder in sequence, detect exposure issues,
+    and save corrected images.
+    """
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # Get all image files in the input folder and sort them alphabetically
+    image_paths = sorted(
+        glob(os.path.join(input_folder, "*.[jJ][pP][gG]")) + 
+        glob(os.path.join(input_folder, "*.[pP][nN][gG]"))
+    )
+
+    for i, image_path in enumerate(image_paths, start=1):
+        # Load the image
+        image = cv2.imread(image_path)
+        if image is None:
+            print(f"Error: Unable to load image {image_path}. Skipping...")
+            continue
+
+        # Detect exposure state
+        exposure_state = detect_exposure(image)
+        print(f"Processing image {i}/{len(image_paths)}: {os.path.basename(image_path)} ({exposure_state})")
+
+        # Correct exposure based on the detected state
+        if exposure_state == "overexposed":
+            corrected_image = correct_overexposure(image)
+        elif exposure_state == "underexposed":
+            corrected_image = correct_underexposure(image)
+        else:
+            corrected_image = image  # No correction needed
+
+        # Save the corrected image
+        output_path = os.path.join(output_folder, os.path.basename(image_path))
+        cv2.imwrite(output_path, corrected_image)
+        print(f"Saved corrected image to {output_path}")
+
+# Example usage
+input_folder = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/undistorted_image_5_params"  # Replace with your input folder path
+output_folder = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/corrected_image"  # Replace with your output folder path
+process_images_in_sequence(input_folder, output_folder)
