@@ -32,12 +32,12 @@ gps:
 denoise:
   denoise_en: true                         # Enable denoising
   seed_thres: 2800.0
-  denoise_radius: 1.0
+  denoise_radius: 0.5
   cluster_seed_radius: 1.0
   noise_thres: 2700.0
-  map_for_clustering_size_thres: 10000
+  map_for_clustering_size_thres: 10000000
   # Statistical outlier removal
   sor:
-    MeanK: 50
-    StddevMulThresh: 1.0                    # Threshold for standard deviation
+    MeanK: 200
+    StddevMulThresh: 0.2                    # Threshold for standard deviation
                

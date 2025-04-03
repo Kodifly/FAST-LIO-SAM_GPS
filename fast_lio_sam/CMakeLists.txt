@@ -29,6 +29,10 @@ find_package(PCL REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(GTSAM REQUIRED)
 find_package(GeographicLib REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem system)
+find_package(nlohmann_json REQUIRED) # v3.11.3
+find_package(CURL REQUIRED)
+
 if(PCL_FOUND)
   message(WARNING "PCL_VER: ${PCL_VERSION}, and PCL_DIR: ${PCL_INCLUDE_DIRS}")
 endif()
@@ -65,4 +69,4 @@ add_executable(${PROJECT_NAME}_node src/main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${COMMON_LIBS} ${PROJECT_NAME}_modules)
 
 add_executable(${PROJECT_NAME}_sensor_recorder src/sensor_recorder.cpp)
-target_link_libraries(${PROJECT_NAME}_sensor_recorder ${COMMON_LIBS} ${PROJECT_NAME}_modules)
+target_link_libraries(${PROJECT_NAME}_sensor_recorder ${COMMON_LIBS} ${PROJECT_NAME}_modules Boost::filesystem nlohmann_json::nlohmann_json ${CURL_LIBRARIES})

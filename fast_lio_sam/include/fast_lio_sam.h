@@ -100,7 +100,8 @@ private:
     ros::Publisher corrected_current_pcd_pub_, corrected_pcd_map_pub_, loop_detection_pub_;
     ros::Publisher realtime_pose_pub_;
     ros::Publisher debug_src_pub_, debug_dst_pub_, debug_fine_aligned_pub_;
-    ros::Publisher debug_intensity_seed_points_pub_, debug_noise_points_pub_, debug_map_for_clustering_pub_, debug_signboards_map_pub_, debug_remained_map_pub_;
+    ros::Publisher debug_intensity_seed_points_pub_, debug_noise_points_pub_, debug_map_for_clustering_pub_, debug_signboards_map_pub_, debug_remained_map_pub_, \
+        debug_segmented_map_pub_;
     ros::Subscriber sub_save_flag_;
     ros::Subscriber sub_gps_;
     ros::Timer loop_timer_, vis_timer_;
@@ -128,7 +129,19 @@ private:
     float StddevMulThresh = 1.0;
     pcl::PointCloud<pcl::PointXYZI> map_for_clustering;
     int map_for_clustering_size_thres = 10000;
+    pcl::PointCloud<pcl::PointXYZI> segmented_map;
+    pcl::PointCloud<pcl::PointXYZI> remained_map;
+    pcl::PointCloud<pcl::PointXYZI> signboards_seed_map;
+
     pcl::PointCloud<pcl::PointXYZI> signboards_map;
+    pcl::PointCloud<pcl::PointXYZI> noise_map;
+
+    // ROS service client for triggering image saving
+    ros::ServiceClient trigger_client_;
+
+    // Variables to track the robot's position and movement
+    Eigen::Vector3d last_position_;
+    double distance_threshold_;
 
 public:
     explicit FastLioSam(const ros::NodeHandle &n_private);
@@ -151,6 +164,10 @@ private:
     void saveFlagCallback(const std_msgs::String::ConstPtr &msg);
     void loopTimerFunc(const ros::TimerEvent &event);
     void visTimerFunc(const ros::TimerEvent &event);
+    void segment_map(const pcl::PointCloud<pcl::PointXYZI>& seed_map, const pcl::PointCloud<pcl::PointXYZI>& ori_map, \
+        pcl::PointCloud<pcl::PointXYZI>& segmented_map, pcl::PointCloud<pcl::PointXYZI>& remained_map);
+    pcl::PointCloud<pcl::PointXYZI> denoise_map(const pcl::PointCloud<pcl::PointXYZI>& seed_map, const pcl::PointCloud<pcl::PointXYZI>& segmented_map);
+    void denoise_slam_map(pcl::PointCloud<pcl::PointXYZI>& slam_map);
 };
 
 
