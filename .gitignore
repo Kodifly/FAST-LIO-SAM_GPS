@@ -1,5 +1,8 @@
 .vscode/
 *.bag
 fast_lio_sam/*.bag
-/fast_lio_sam/result.pcd
-/fast_lio_sam/sequence*/
+fast_lio_sam/backup/*
+fast_lio_sam/data/*
+fast_lio_sam/results/*
+fast_lio_sam/result.pcd
+post_process/lidar_projection/build
