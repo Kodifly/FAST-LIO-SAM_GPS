@@ -75,6 +75,10 @@
     roslaunch fast_lio_sam run.launch lidar:=newer-college20
     ```
 
+## How to save slam map
+    ```shell
+    rostopic pub /save_dir std_msgs/String "/media/kodifly/Extreme\ SSD/isds_sample_data_0515"
+    ```
 <br>
 
 ### Structure
