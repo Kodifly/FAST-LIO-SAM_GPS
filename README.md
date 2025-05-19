@@ -76,9 +76,11 @@
     ```
 
 ## How to save slam map
++ Send a save_dir to fast-lio-sam
     ```shell
     rostopic pub /save_dir std_msgs/String "/media/kodifly/Extreme\ SSD/isds_sample_data_0515"
     ```
+    
 <br>
 
 ### Structure
