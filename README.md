@@ -58,7 +58,7 @@
 
     cd ..
     catkin build -DCMAKE_BUILD_TYPE=Release
-    . devel/setup.bash
+    source devel/setup.bash
     ```
 
 ## How to run
