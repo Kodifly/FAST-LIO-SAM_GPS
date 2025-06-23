@@ -54,7 +54,7 @@
 + Get the code and build
     ```shell
     cd ~/your_workspace/src
-    git clone https://github.com/engcang/FAST-LIO-SAM --recursive
+    git clone https://github.com/Kodifly/FAST-LIO-SAM_GPS.git --recursive
 
     cd ..
     catkin build -DCMAKE_BUILD_TYPE=Release
