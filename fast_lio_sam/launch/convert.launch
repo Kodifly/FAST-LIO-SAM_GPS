@@ -2,7 +2,7 @@
 
 	<arg name="rviz" default="false" />
  	<!-- <param name="use_sim_time" value="true" /> -->
-	<arg name="image_topic" default="/left_camera/image" />
+	<arg name="image_topic" default="/DA6102933/image" />
 	<arg name="undistorted_image_topic" default="/left_camera/undistorted_image" />
 	<arg name="lidar_topic" default="/ouster/points" />
 	<arg name="imu_topic" default="/ouster/imu" />

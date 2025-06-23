@@ -19,8 +19,8 @@ result:
   save_voxel_resolution: 0.3                # voxel resolution to save map in .pcd format and visualize in rviz
   save_map_pcd: true                        # Save result map in .pcd format, not voxelized and hence file size could be huge
   save_map_bag: false                        # Save result map in .bag format, NOTE: this is used for FAST-LIO-Localization-QN (https://github.com/engcang/FAST-LIO-Localization-QN)
-  save_in_kitti_format: false                # Save result in KITTI format
-  seq_name: "isds_sample_data"                      # sequence name for saving scans and corresponding poses
+  save_in_kitti_format: true                # Save result in KITTI format
+  seq_name: "HKIsland1_0618"                      # sequence name for saving scans and corresponding poses
 
 gps:
   use_gps: false                            # Use GPS factor in PGO
@@ -33,7 +33,7 @@ denoise:
   denoise_en: true                         # Enable denoising
   seed_thres: 2800.0
   denoise_radius: 0.5
-  cluster_seed_radius: 1.0
+  cluster_seed_radius: 0.1
   noise_thres: 2700.0
   map_for_clustering_size_thres: 10000000
   # Statistical outlier removal

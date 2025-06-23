@@ -5,8 +5,8 @@ import numpy as np
 import argparse
 
 # Fixed field names
-# FIELD_NAMES = ["x", "y", "z", "intensity", "t", "reflectivity", "ring", "ambient", "range"]
-FIELD_NAMES = ["x", "y", "z", "intensity"]
+FIELD_NAMES = ["x", "y", "z", "intensity", "t", "reflectivity", "ring", "ambient", "range"]
+# FIELD_NAMES = ["x", "y", "z", "intensity"]
 
 def bin_to_pcd(bin_file, pcd_file, field_names):
     """

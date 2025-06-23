@@ -42,8 +42,8 @@ def decompress_images_from_bag(bag_file, image_topic, output_dir):
     bag.close()
 
 if __name__ == "__main__":
-    bag_file = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye.bag"
-    image_topic = "/hik_camera/image/compressed"
-    output_dir = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/fisheye_image/"
+    bag_file = "/media/kodifly/Extreme SSD/isds_scan_data/sample_data_0605/Route1-0deg-2025-06-05-14-34-23.bag"
+    image_topic = "/left_camera/image/compressed"
+    output_dir = "/media/kodifly/Extreme SSD/tmp_for_demo/dist_img"
 
     decompress_images_from_bag(bag_file, image_topic, output_dir)

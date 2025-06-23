@@ -77,8 +77,8 @@ def extract_pointcloud_from_bag(bag_file, pointcloud_topic, output_dir):
             points_array = np.array(points_list, dtype=dtype)
 
             # Save as .pcd file
-            pcd_filename = os.path.join(output_dir, f"{sec}.{nsec_padded}.pcd")
-            save_pcd(points_array, field_names, pcd_filename)
+            # pcd_filename = os.path.join(output_dir, f"{sec}.{nsec_padded}.pcd")
+            # save_pcd(points_array, field_names, pcd_filename)
 
             # Save as .bin file
             bin_filename = os.path.join(output_dir, f"{sec}.{nsec_padded}.bin")
@@ -90,8 +90,8 @@ def extract_pointcloud_from_bag(bag_file, pointcloud_topic, output_dir):
     bag.close()
 
 if __name__ == "__main__":
-    bag_file = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye.bag"
+    bag_file = "/media/kodifly/Extreme SSD/isds_scan_data/Kowloon/front_right_2025-05-27-10-58-08.bag"
     pointcloud_topic = "/ouster/points"
-    output_dir = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/ouster_scan/"
+    output_dir = "/media/kodifly/Extreme SSD/isds_scan_data/sample_data_scheduled_routes_0527/Kowloon/front_right/ouster_bin/"
 
     extract_pointcloud_from_bag(bag_file, pointcloud_topic, output_dir)

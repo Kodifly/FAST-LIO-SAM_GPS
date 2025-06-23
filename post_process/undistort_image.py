@@ -68,7 +68,7 @@ def process_images_in_sequence(input_dir, output_dir_5_params, output_dir_8_para
 
         try:
             # Undistort using 5-parameter model
-            undistort_image(input_image_path, camera_matrix_5_params, dist_coeffs_5_params, output_image_path_5_params)
+            # undistort_image(input_image_path, camera_matrix_5_params, dist_coeffs_5_params, output_image_path_5_params)
 
             # Undistort using 8-parameter model
             undistort_image(input_image_path, camera_matrix_8_params, dist_coeffs_8_params, output_image_path_8_params)
@@ -87,19 +87,19 @@ if __name__ == "__main__":
     ])
 
     camera_matrix_8_params = np.array([
-        [1421.907845, 0, 2089.558264],  # fx, 0, cx
-        [0, 1422.359993, 1234.974194],  # 0, fy, cy
+        [1419.488223, 0, 2091.72389],  # fx, 0, cx
+        [0, 1419.783836, 1231.71474],  # 0, fy, cy
         [0, 0, 1]                       # 0, 0, 1
     ])
 
     # Distortion coefficients (k1, k2, p1, p2, k3, [k4, k5, k6])
     dist_coeffs_5_params = np.array([-0.2972345646, 0.08469466538, -0.0004248149362, -0.000175399726, 0.0])  # 5-parameter model
-    dist_coeffs_8_params = np.array([0.5119036662, 0.01388166828, -0.0002266667995, -6.567921718e-05, -0.0006314262371, 0.8458882819, 0.1042484193, -0.002293472949])  # 8-parameter model
+    dist_coeffs_8_params = np.array([0.4765817545, 0.0267510319, 1.495544387e-07, -2.581193063e-07, 8.833337814e-05, 0.8074516265, 0.1103335164, 0.001695886702])  # 8-parameter model
 
     # Input and output directories
-    input_directory = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/fisheye_image"
-    output_directory_5_params = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/undistorted_image_5_params"
-    output_directory_8_params = "/home/kodifly/datasets/rosbag/sample_data/4km_50kmh_ouster_fisheye/undistorted_image_8_params"
+    input_directory = "/media/kodifly/Extreme SSD/isds_sample_data_0515/fisheye_image"
+    output_directory_5_params = "/media/kodifly/Extreme SSD/isds_sample_data_0515/tmp"
+    output_directory_8_params = "/media/kodifly/Extreme SSD/isds_sample_data_0515/rectified_image"
 
     # Process images in sequence and save both 5-parameter and 8-parameter undistorted images
     process_images_in_sequence(

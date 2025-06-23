@@ -782,10 +782,10 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
             for (size_t i = 0; i < keyframes_.size(); ++i)
             {
                 // Save the point cloud
-                std::stringstream ss_;
-                ss_ << scans_directory << "/" << std::setw(6) << std::setfill('0') << i << ".pcd";
-                ROS_INFO("Saving %s...", ss_.str().c_str());
-                pcl::io::savePCDFileASCII<PointType>(ss_.str(), keyframes_[i].pcd_);
+                // std::stringstream ss_;
+                // ss_ << scans_directory << "/" << std::setw(6) << std::setfill('0') << i << ".pcd";
+                // ROS_INFO("Saving %s...", ss_.str().c_str());
+                // pcl::io::savePCDFileASCII<PointType>(ss_.str(), keyframes_[i].pcd_);
 
                 // Save the pose in KITTI format
                 const auto &pose_ = keyframes_[i].pose_corrected_eig_;
