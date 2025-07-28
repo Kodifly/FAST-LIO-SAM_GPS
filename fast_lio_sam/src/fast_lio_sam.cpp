@@ -3,7 +3,44 @@
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/extract_indices.h>
 #include <std_srvs/Trigger.h> // For the trigger service
+#include <ctime>
+#include <cstdio>
+#include <cmath>
+// -----------------------------------------------------------------------------
+// Helper to convert UNIX epoch time (in seconds, ROS format) to the desired
+// yyyymmddhhmmssSSS string with millisecond precision. This is used when we
+// save poses in TUM format so that both the timestamps inside the file and the
+// filename itself are human-readable.
+static std::string unixToReadableTimestamp(double unix_ts)
+{
+    std::time_t t_sec = static_cast<std::time_t>(unix_ts);
+    std::tm tm_res;
+#ifdef _WIN32
+    localtime_s(&tm_res, &t_sec);
+#else
+    localtime_r(&t_sec, &tm_res);
+#endif
+    char date_buf[32];
+    std::strftime(date_buf, sizeof(date_buf), "%Y%m%d%H%M%S", &tm_res); // yyyymmddhhmmss
 
+    // Milliseconds part (0-999)
+    int millis = static_cast<int>(std::round((unix_ts - static_cast<double>(t_sec)) * 1000.0));
+    if (millis == 1000) // handle edge case where rounding pushes to next second
+    {
+        millis = 0;
+        t_sec += 1;
+#ifdef _WIN32
+        localtime_s(&tm_res, &t_sec);
+#else
+        localtime_r(&t_sec, &tm_res);
+#endif
+        std::strftime(date_buf, sizeof(date_buf), "%Y%m%d%H%M%S", &tm_res);
+    }
+
+    char final_buf[40];
+    std::snprintf(final_buf, sizeof(final_buf), "%s%03d", date_buf, millis);
+    return std::string(final_buf);
+}
 // Define color codes
 const std::string RED = "\033[31m";
 const std::string GREEN = "\033[32m";
@@ -775,7 +812,13 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
         fs::create_directories(scans_directory);
 
         std::ofstream kitti_pose_file(seq_directory + "/poses_kitti.txt");
-        std::ofstream tum_pose_file(seq_directory + "/poses_tum.txt");
+
+        // Determine start & end time strings for the filename
+        std::string start_time_str = unixToReadableTimestamp(keyframes_.front().timestamp_);
+        std::string end_time_str   = unixToReadableTimestamp(keyframes_.back().timestamp_);
+        std::string tum_file_path  = seq_directory + "/slam_poses_" + start_time_str + "_" + end_time_str + ".txt";
+
+        std::ofstream tum_pose_file(tum_file_path);
         tum_pose_file << "#timestamp x y z qx qy qz qw\n";
         {
             std::lock_guard<std::mutex> lock(keyframes_mutex_);
@@ -795,8 +838,11 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
                                 << pose_(2, 1) << " " << pose_(2, 2) << " " << pose_(2, 3) << "\n";
 
                 const auto &lidar_optim_pose_ = poseEigToPoseStamped(keyframes_[i].pose_corrected_eig_);
-                tum_pose_file << std::fixed << std::setprecision(8) << keyframes_[i].timestamp_
-                              << " " << lidar_optim_pose_.pose.position.x << " "
+                // Convert ROS timestamp to human-readable format
+                std::string ts_readable = unixToReadableTimestamp(keyframes_[i].timestamp_);
+
+                tum_pose_file << ts_readable << " "
+                              << lidar_optim_pose_.pose.position.x << " "
                               << lidar_optim_pose_.pose.position.y << " "
                               << lidar_optim_pose_.pose.position.z << " "
                               << lidar_optim_pose_.pose.orientation.x << " "
@@ -839,14 +885,14 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
             std::lock_guard<std::mutex> lock(keyframes_mutex_);
             for (size_t i = 0; i < keyframes_.size(); ++i)
             {
-                map_for_denoise += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
-                // *corrected_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
-                if (map_for_denoise.size() > map_for_clustering_size_thres)
-                {
-                    denoise_slam_map(map_for_denoise);
-                    *corrected_map += map_for_denoise;
-                    map_for_denoise.clear();
-                }
+                // map_for_denoise += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
+                *corrected_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
+                // if (map_for_denoise.size() > map_for_clustering_size_thres)
+                // {
+                //     denoise_slam_map(map_for_denoise);
+                //     *corrected_map += map_for_denoise;
+                //     map_for_denoise.clear();
+                // }
             }
         }
         // denoise_slam_map(*corrected_map);

@@ -8,8 +8,7 @@ from sensor_msgs.msg import CompressedImage
 
 def decompress_images_from_bag(bag_file, image_topic, output_dir):
     """
-    Decompress images from a ROS bag file and save them as .jpg files.
-    Filenames are in the 'sec.nsec' format, with nsec padded to 9 digits.
+    Decompress images from a ROS bag file and save them as sequentially numbered .jpg files.
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -17,24 +16,21 @@ def decompress_images_from_bag(bag_file, image_topic, output_dir):
     bridge = CvBridge()
     bag = rosbag.Bag(bag_file, "r")
 
+    image_counter = 0  # Counter for sequential naming
+
     for topic, msg, t in bag.read_messages(topics=[image_topic]):
         try:
             # Convert CompressedImage to OpenCV format
             cv_image = bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
-            # Extract seconds and nanoseconds from the timestamp
-            sec = msg.header.stamp.secs
-            nsec = msg.header.stamp.nsecs
-
-            # Ensure nsec is always 9 digits by padding with leading zeros
-            nsec_padded = f"{nsec:09d}"  # Formats nsec as a 9-digit number (e.g., 000000000)
-
-            # Create the filename in 'sec.nsec.jpg' format
-            image_filename = os.path.join(output_dir, f"{sec}.{nsec_padded}.jpg")
+            # Create the filename with leading zeros (e.g., image_00001.jpg)
+            image_filename = os.path.join(output_dir, f"image_{image_counter:05d}.jpg")
 
             # Save the image
             cv2.imwrite(image_filename, cv_image)
             print(f"Saved decompressed image: {image_filename}")
+
+            image_counter += 1  # Increment counter
 
         except Exception as e:
             print(f"Error decompressing image: {e}")
@@ -42,8 +38,8 @@ def decompress_images_from_bag(bag_file, image_topic, output_dir):
     bag.close()
 
 if __name__ == "__main__":
-    bag_file = "/home/kodifly/ssd2/indo_scan_data/20250710/route1.bag"
-    image_topic = "/left_camera/image/compressed"
-    output_dir = "/home/kodifly/ssd2/indo_scan_data/20250710/data/image_route1"
+    bag_file = "/home/kodifly/ssd2/tunnel_data/20250713_Jordan_Central/TST-Central-video.bag"
+    image_topic = "/hikrobot/image/compressed"
+    output_dir = "/home/kodifly/ssd2/tunnel_data/20250713_Jordan_Central/data/TST_Central"
 
     decompress_images_from_bag(bag_file, image_topic, output_dir)
