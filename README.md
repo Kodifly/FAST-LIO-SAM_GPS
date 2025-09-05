@@ -10,33 +10,11 @@
       + This repo is to learn GTSAM myself\!
       + and as GTSAM tutorial for beginners - [GTSAM 튜토리얼 한글 포스팅](https://engcang.github.io/2023/07/15/gtsam_tutorial.html)
 
-\<p align="center"\>
-\<img src="imgs/fast1.png" height="300"/\>
-\<img src="imgs/sam1.png" height="300"/\>
-\<br\>
-\<em\>KITTI seq 05 top view - (left): FAST-LIO2 (right): FAST-LIO-SAM\</em\>
-\</p\>
-\<p align="center"\>
-\<img src="imgs/fast2.png" width="600"/\>
-\<img src="imgs/sam2.png" width="600"/\>
-\<br\>
-\<em\>KITTI seq 05 side view - (top): FAST-LIO2 (bottom): FAST-LIO-SAM\</em\>
-\</p\>
-\<p align="center"\>
-\<img src="imgs/traj.png" width="600"/\>
-\<br\>
-\<em\>KITTI seq 05 trajectories - (blue): FAST-LIO2 (green): FAST-LIO-SAM\</em\>
-\</p\>
-
-\<br\>
-
 ## Note
 
   + For better loop-detection and transform calculation, [FAST-LIO-SAM-QN](https://github.com/engcang/FAST-LIO-SAM-QN) is also coded and opened.
       + It adopts [Quatro](https://github.com/url-kaist/Quatro) - fast, accurate and robust global registration which provides great initial guess of transform
       + and [Nano-GICP](https://github.com/vectr-ucla/direct_lidar_odometry) - fast and accurate ICP combining [FastGICP](https://github.com/SMRT-AIST/fast_gicp) + [NanoFLANN](https://github.com/jlblancoc/nanoflann)
-
-\<br\>
 
 -----
 
@@ -152,8 +130,6 @@ Follow these steps to create your workspace, clone the repository with its submo
     rostopic pub /save_dir std_msgs/String "/path/to/save/your/map.pcd"
     ```
 
-\<br\>
-
 -----
 
 ### Structure
@@ -167,8 +143,6 @@ Follow these steps to create your workspace, clone the repository with its submo
       + Detects loop closures. If a loop is found, a factor is added to the pose graph.
   + **visTimerFunc**
       + Visualizes all components. **(Note: The global map is only visualized once. Uncheck/re-check the `mapped_pcd` topic in RViz to refresh the view and save computational resources.)**
-
-\<br\>
 
 -----
 
