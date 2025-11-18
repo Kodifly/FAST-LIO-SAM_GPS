@@ -68,5 +68,5 @@ target_link_libraries(${PROJECT_NAME}_modules ${COMMON_LIBS} ${GeographicLib_LIB
 add_executable(${PROJECT_NAME}_node src/main.cpp)
 target_link_libraries(${PROJECT_NAME}_node ${COMMON_LIBS} ${PROJECT_NAME}_modules)
 
-add_executable(${PROJECT_NAME}_sensor_recorder src/sensor_recorder.cpp)
-target_link_libraries(${PROJECT_NAME}_sensor_recorder ${COMMON_LIBS} ${PROJECT_NAME}_modules Boost::filesystem nlohmann_json::nlohmann_json ${CURL_LIBRARIES})
+# add_executable(${PROJECT_NAME}_sensor_recorder src/sensor_recorder.cpp)
+# target_link_libraries(${PROJECT_NAME}_sensor_recorder ${COMMON_LIBS} ${PROJECT_NAME}_modules Boost::filesystem nlohmann_json::nlohmann_json ${CURL_LIBRARIES})
