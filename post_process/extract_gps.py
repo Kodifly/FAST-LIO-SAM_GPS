@@ -1,43 +1,45 @@
 #!/usr/bin/env python3
 
 import rosbag
-import time
 import os
 
-def extract_gps_to_unix_named_file(bag_file, gps_topic):
+def extract_gps_data(bag_file, topic_name, output_file):
     """
-    Extracts GPS data from a ROS bag and saves it to a file named with the current Unix timestamp.
-    
-    Output format:
+    Extracts GPS data from a ROS bag and writes it to a text file.
+
+    Format:
         #timestamp latitude longitude altitude
     """
-    # Generate output filename using current Unix timestamp (integer seconds)
-    unix_ts = int(time.time())
-    output_dir = os.path.dirname(bag_file)
-    output_file = os.path.join(output_dir, f"gps_{unix_ts}.txt")
-
     with open(output_file, 'w') as f:
+        # Write header if needed
         f.write("#timestamp latitude longitude altitude\n")
 
         bag = rosbag.Bag(bag_file, "r")
-        for topic, msg, t in bag.read_messages(topics=[gps_topic]):
+        for topic, msg, t in bag.read_messages(topics=[topic_name]):
             try:
-                timestamp = msg.header.stamp.to_sec()  # Already Unix time (float)
+                # Use message timestamp in seconds
+                timestamp = msg.header.stamp.to_sec()
                 lat = msg.latitude
                 lon = msg.longitude
-                alt = round(msg.altitude, 3)
+                alt = round(msg.altitude, 3)  # Keep only 3 decimal places for altitude
 
+                # Write line to file
                 f.write(f"{timestamp} {lat} {lon} {alt}\n")
             except Exception as e:
                 print(f"Error processing GPS message: {e}")
+
         bag.close()
-
     print(f"GPS data saved to: {output_file}")
-    return output_file
-
 
 if __name__ == "__main__":
-    BAG_FILE = "/media/kodifly/Extreme Pro/2025-11-11-rosbags/_2025-11-11-13-55-48.bag"
+    # Input ROS bag file
+    BAG_FILE = "/home/kodifly/ssd3/isds_scan_data_0618/2025-06-18-14-17-23.bag"
+
+    # GPS topic name
     GPS_TOPIC = "/gps/fix"
 
-    extract_gps_to_unix_named_file(BAG_FILE, GPS_TOPIC)
+    # Output file path
+    OUTPUT_FILE = "/home/kodifly/ssd3/isds_scan_data_0618/kowloon/gps_data.txt"
+
+    # Run extraction
+    extract_gps_data(BAG_FILE, GPS_TOPIC, OUTPUT_FILE)

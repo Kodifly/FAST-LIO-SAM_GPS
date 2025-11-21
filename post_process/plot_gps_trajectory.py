@@ -41,7 +41,7 @@ def parse_gps_file(filename):
 
 
 # --- Main Script ---
-filename = '/home/kodifly/ssd1/indo_0828/lane1/demo/gps_000.txt' # Replace with your file path
+filename = 'gps_data_20250716115006800_20250716120011099.txt' # Replace with your file path
 timestamps, latitudes, longitudes, altitudes = parse_gps_file(filename)
 
 if len(latitudes) > 0:
