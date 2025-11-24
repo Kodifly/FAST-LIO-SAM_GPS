@@ -26,12 +26,17 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
 )
-find_package(PCL REQUIRED)
+
 find_package(Eigen3 REQUIRED)
-find_package(GTSAM REQUIRED)
+# set(PCL_DIR "/usr/local/share/pcl-1.10")
+find_package(PCL 1.10 REQUIRED)
+
+find_package(GTSAM 4.1.1 REQUIRED)
+# set(GeographicLib_DIR "/usr/local/share/GeographicLib")
+# set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "/usr/share/cmake/geographiclib/")
 find_package(GeographicLib REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem system)
-find_package(nlohmann_json REQUIRED) # v3.11.3
+# find_package(nlohmann_json REQUIRED) # v3.11.3
 find_package(CURL REQUIRED)
 
 if(PCL_FOUND)

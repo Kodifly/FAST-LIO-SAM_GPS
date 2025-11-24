@@ -1,0 +1,25 @@
+FROM docker.io/gc625kodifly/fast_livo2:latest
+
+RUN sudo apt update && sudo apt install software-properties-common -y && sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y && \
+sudo apt update && \
+sudo apt install gcc-9 g++-9 && \
+cd /usr/bin && sudo rm gcc g++ && \
+sudo ln -s gcc-9 gcc && sudo ln -s g++-9 g++
+
+WORKDIR /home/admin/
+RUN wget https://github.com/intel/tbb/archive/2019_U8.tar.gz && \
+tar zxvf 2019_U8.tar.gz && \
+rm 2019_U8.tar.gz && cd oneTBB-2019_U8 && \
+cp build/linux.gcc.inc build/linux.gcc-9.inc && \
+sed -i -E 's/^CPLUS[[:space:]]*\?=[[:space:]]*g\+\+$/CPLUS ?= g++-9/' build/linux.gcc-9.inc && \
+sed -i -E 's/^CONLY[[:space:]]*\?=[[:space:]]*gcc$/CONLY ?= gcc-9/'   build/linux.gcc-9.inc && \
+make compiler=gcc-9 stdver=c++17 tbb_build_prefix=my_tbb_build && \
+sudo mkdir /usr/local/tbb-2019_U8 && \
+sudo cp -r include /usr/local/tbb-2019_U8/include && \
+sudo ln -s /usr/local/tbb-2019_U8/include/tbb /usr/local/include/tbb && \
+sudo cp -r build/my_tbb_build_release /usr/local/tbb-2019_U8/lib && \
+sudo ln -s /usr/local/tbb-2019_U8/lib/libtbb.so.2 /usr/local/lib/libtbb.so && \
+sudo ln -s /usr/local/tbb-2019_U8/lib/libtbbmalloc.so.2 /usr/local/lib/libtbbmalloc.so && \
+sudo ln -s /usr/local/tbb-2019_U8/lib/libtbbmalloc_proxy.so.2 /usr/local/lib/libtbbmalloc_proxy.so && \
+echo 'export LD_LIBRARY_PATH=/usr/local/tbb-2019_U8/lib:$LD_LIBRARY_PATH' >> ~/.bashrc && \
+source ~/.bashrc

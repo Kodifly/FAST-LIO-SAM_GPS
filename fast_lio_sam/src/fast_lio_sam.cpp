@@ -406,6 +406,8 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
         last_position_ = current_position;
     }
 
+    std::cout << colorize("Processing LiDAR frame at time: " + std::to_string(current_frame_.timestamp_), BLUE) << std::endl;
+
     // save ori_cloud
     // ori_cloud.width = ori_cloud.size();
     // ori_cloud.height = 1;
@@ -451,6 +453,7 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
     }
     else
     {
+        std::cout << colorize("Checking for keyframe...", MAGENTA) << std::endl;
         //// 2. check if keyframe
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
         if (checkIfKeyframe(current_frame_, keyframes_.back()))
@@ -487,23 +490,29 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                 updateOdomsAndPaths(current_frame_);
             }
 
+            std::cout << colorize("Optimizing graph...", CYAN) << std::endl;
             //// 4. optimize with graph
             high_resolution_clock::time_point t4 = high_resolution_clock::now();
             // m_corrected_esti = gtsam::LevenbergMarquardtOptimizer(m_gtsam_graph, init_esti_).optimize(); // cf. isam.update vs values.LM.optimize
             {
                 std::lock_guard<std::mutex> lock(graph_mutex_);
+                std::cout << colorize("Updating ISAM2 with " + std::to_string(gtsam_graph_.size()) + " new factors...", YELLOW) << std::endl;
                 isam_handler_->update(gtsam_graph_, init_esti_);
+                std::cout << colorize("Graph size: " + std::to_string(isam_handler_->getFactorsUnsafe().size()) + " factors, " +
+                                        std::to_string(isam_handler_->getLinearizationPoint().size()) + " values.", YELLOW) << std::endl;
                 isam_handler_->update();
                 if (loop_added_flag_) // https://github.com/TixiaoShan/LIO-SAM/issues/5#issuecomment-653752936
                 {
                     isam_handler_->update();
-                    isam_handler_->update();
-                    isam_handler_->update();
+                    // isam_handler_->update();
+                    // isam_handler_->update();
                 }
+                std::cout << colorize("Optimization done.", GREEN) << std::endl;
                 gtsam_graph_.resize(0);
                 init_esti_.clear();
             }
 
+            std::cout << colorize("Handling corrected results...", CYAN) << std::endl;
             //// 5. handle corrected results
             // get corrected poses and reset odom delta (for realtime pose pub)
             high_resolution_clock::time_point t5 = high_resolution_clock::now();

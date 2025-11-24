@@ -210,12 +210,13 @@ def save_geo_referenced_slam_wgs84_integer_ts(slam_ts, slam_xyz, aligned_slam_2d
 
 def save_alignment_parameters(scale, R, T, output_dir):
     path = os.path.join(output_dir, "geo_ref_matrix.txt")
-    angle_deg = np.degrees(np.arctan2(R[1,0], R[0,0]))
     with open(path, 'w') as f:
-        f.write(f"scale = {scale:.8f}\n")
-        f.write(f"rotation_matrix_2d = [[{R[0,0]: .6f}, {R[0,1]: .6f}], [{R[1,0]: .6f}, {R[1,1]: .6f}]]\n")
-        f.write(f"translation_vector_2d = [{T[0]:.6f}, {T[1]:.6f}]\n")
-        f.write(f"rotation_angle_xy_deg = {angle_deg:.6f}\n")
+        f.write("# Alignment: P_gps = s * R * P_slam + T\n")
+        f.write(f"scale: {scale:.8f}\n")
+        f.write("rotation_matrix:\n")
+        f.write(f"   {R[0,0]: .8f} {R[0,1]: .8f}\n")
+        f.write(f"   {R[1,0]: .8f} {R[1,1]: .8f}\n")
+        f.write(f"translation_vector: [{T[0]:.8f}, {T[1]:.8f}]\n")
     print(f"Saved alignment params: {path}")
 
 # ======================
