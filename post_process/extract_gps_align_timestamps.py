@@ -4,6 +4,7 @@ import rosbag
 import os
 import datetime
 import argparse
+import shutil                    # <-- added
 
 # ---------- GPS Extraction ----------
 def unix_to_yyyymmddhhmmssmmm(unix_ts):
@@ -159,7 +160,15 @@ def main():
         # slam_out = os.path.join(output_dir, "poses_tum_converted.txt")
         # align_slam_to_gps(args.slam_file, gps_file, slam_out)
         gps_out = os.path.join(output_dir, "gps_data_aligned.txt")
-        align_gps_to_slam(gps_file, args.slam_file, gps_out)
+        ok = align_gps_to_slam(gps_file, args.slam_file, gps_out)
+
+        # after processing, copy/rename provided SLAM file to "poses_tum_converted.txt" in output_dir
+        try:
+            dst_slam_name = os.path.join(output_dir, "poses_tum_converted.txt")
+            shutil.copyfile(args.slam_file, dst_slam_name)
+            print(f"Copied SLAM file to: {dst_slam_name}")
+        except Exception as e:
+            print(f"Warning: failed to copy SLAM file to poses_tum_converted.txt: {e}")
     else:
         print("No SLAM file provided — skipping alignment.")
 
