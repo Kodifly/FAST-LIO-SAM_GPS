@@ -83,6 +83,39 @@ def align_slam_to_gps(slam_file, gps_file, output_file):
     print(f"Aligned SLAM file saved to: {output_file}")
     return True
 
+def align_gps_to_slam(gps_file, slam_file, output_file):
+    """Shift GPS timestamps so that its first timestamp matches SLAM first timestamp."""
+    try:
+        gps_start = get_first_timestamp(gps_file)
+        slam_start = get_first_timestamp(slam_file)
+    except ValueError as e:
+        print(f"Error: {e}")
+        return False
+
+    offset = slam_start - gps_start
+    print(f"GPS start:  {gps_start}")
+    print(f"SLAM start: {slam_start}")
+    print(f"Offset (SLAM - GPS): {offset}")
+
+    with open(gps_file, 'r') as infile, open(output_file, 'w') as outfile:
+        for line in infile:
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                outfile.write(line)
+                continue
+
+            parts = stripped.split()
+            try:
+                orig_ts = int(parts[0])
+                new_ts = orig_ts + offset
+                parts[0] = str(new_ts)
+                outfile.write(' '.join(parts) + '\n')
+            except (ValueError, IndexError):
+                outfile.write(line)
+
+    print(f"Aligned GPS file saved to: {output_file}")
+    return True
+
 # ---------- Main ----------
 def main():
     parser = argparse.ArgumentParser(
@@ -123,8 +156,10 @@ def main():
             print(f"Error: SLAM file not found: {args.slam_file}")
             return
 
-        slam_out = os.path.join(output_dir, "poses_tum_converted.txt")
-        align_slam_to_gps(args.slam_file, gps_file, slam_out)
+        # slam_out = os.path.join(output_dir, "poses_tum_converted.txt")
+        # align_slam_to_gps(args.slam_file, gps_file, slam_out)
+        gps_out = os.path.join(output_dir, "gps_data_aligned.txt")
+        align_gps_to_slam(gps_file, args.slam_file, gps_out)
     else:
         print("No SLAM file provided — skipping alignment.")
 
