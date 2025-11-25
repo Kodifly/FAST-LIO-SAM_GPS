@@ -443,11 +443,11 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
         keyframes_.push_back(current_frame_);
         updateOdomsAndPaths(current_frame_);
         // graph
-        auto variance_vector = (gtsam::Vector(6) << 1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2).finished(); // rad*rad,
-                                                                                                    // meter*meter
-        gtsam::noiseModel::Diagonal::shared_ptr prior_noise = gtsam::noiseModel::Diagonal::Variances(variance_vector);
-        gtsam_graph_.add(gtsam::PriorFactor<gtsam::Pose3>(0, poseEigToGtsamPose(current_frame_.pose_eig_), prior_noise));
-        init_esti_.insert(current_keyframe_idx_, poseEigToGtsamPose(current_frame_.pose_eig_));
+        // auto variance_vector = (gtsam::Vector(6) << 1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2).finished(); // rad*rad,
+        //                                                                                             // meter*meter
+        // gtsam::noiseModel::Diagonal::shared_ptr prior_noise = gtsam::noiseModel::Diagonal::Variances(variance_vector);
+        // gtsam_graph_.add(gtsam::PriorFactor<gtsam::Pose3>(0, poseEigToGtsamPose(current_frame_.pose_eig_), prior_noise));
+        // init_esti_.insert(current_keyframe_idx_, poseEigToGtsamPose(current_frame_.pose_eig_));
         current_keyframe_idx_++;
         is_initialized_ = true;
     }
@@ -463,24 +463,24 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                 std::lock_guard<std::mutex> lock(keyframes_mutex_);
                 keyframes_.push_back(current_frame_);
             }
-            // 2-3. if so, add to graph
-            auto variance_vector = (gtsam::Vector(6) << 1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2).finished();
-            gtsam::noiseModel::Diagonal::shared_ptr odom_noise = gtsam::noiseModel::Diagonal::Variances(variance_vector);
-            gtsam::Pose3 pose_from = poseEigToGtsamPose(keyframes_[current_keyframe_idx_ - 1].pose_corrected_eig_);
-            gtsam::Pose3 pose_to = poseEigToGtsamPose(current_frame_.pose_corrected_eig_);
-            {
-                std::lock_guard<std::mutex> lock(graph_mutex_);
-                gtsam_graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(current_keyframe_idx_ - 1,
-                                                                    current_keyframe_idx_,
-                                                                    pose_from.between(pose_to),
-                                                                    odom_noise));
-                init_esti_.insert(current_keyframe_idx_, pose_to);
-            }
-            // 2-4, if so, add gps factor
-            if (use_gps)
-            {
-                add_gps_factor(current_frame_);
-            }
+        //     // 2-3. if so, add to graph
+        //     auto variance_vector = (gtsam::Vector(6) << 1e-4, 1e-4, 1e-4, 1e-2, 1e-2, 1e-2).finished();
+        //     gtsam::noiseModel::Diagonal::shared_ptr odom_noise = gtsam::noiseModel::Diagonal::Variances(variance_vector);
+        //     gtsam::Pose3 pose_from = poseEigToGtsamPose(keyframes_[current_keyframe_idx_ - 1].pose_corrected_eig_);
+        //     gtsam::Pose3 pose_to = poseEigToGtsamPose(current_frame_.pose_corrected_eig_);
+        //     {
+        //         std::lock_guard<std::mutex> lock(graph_mutex_);
+        //         gtsam_graph_.add(gtsam::BetweenFactor<gtsam::Pose3>(current_keyframe_idx_ - 1,
+        //                                                             current_keyframe_idx_,
+        //                                                             pose_from.between(pose_to),
+        //                                                             odom_noise));
+        //         init_esti_.insert(current_keyframe_idx_, pose_to);
+        //     }
+        //     // 2-4, if so, add gps factor
+        //     if (use_gps)
+        //     {
+        //         add_gps_factor(current_frame_);
+        //     }
             current_keyframe_idx_++;
 
             //// 3. vis
@@ -490,59 +490,59 @@ void FastLioSam::odomPcdCallback(const nav_msgs::OdometryConstPtr &odom_msg,
                 updateOdomsAndPaths(current_frame_);
             }
 
-            std::cout << colorize("Optimizing graph...", CYAN) << std::endl;
-            //// 4. optimize with graph
-            high_resolution_clock::time_point t4 = high_resolution_clock::now();
-            // m_corrected_esti = gtsam::LevenbergMarquardtOptimizer(m_gtsam_graph, init_esti_).optimize(); // cf. isam.update vs values.LM.optimize
-            {
-                std::lock_guard<std::mutex> lock(graph_mutex_);
-                std::cout << colorize("Updating ISAM2 with " + std::to_string(gtsam_graph_.size()) + " new factors...", YELLOW) << std::endl;
-                isam_handler_->update(gtsam_graph_, init_esti_);
-                std::cout << colorize("Graph size: " + std::to_string(isam_handler_->getFactorsUnsafe().size()) + " factors, " +
-                                        std::to_string(isam_handler_->getLinearizationPoint().size()) + " values.", YELLOW) << std::endl;
-                isam_handler_->update();
-                if (loop_added_flag_) // https://github.com/TixiaoShan/LIO-SAM/issues/5#issuecomment-653752936
-                {
-                    isam_handler_->update();
-                    // isam_handler_->update();
-                    // isam_handler_->update();
-                }
-                std::cout << colorize("Optimization done.", GREEN) << std::endl;
-                gtsam_graph_.resize(0);
-                init_esti_.clear();
-            }
+            // std::cout << colorize("Optimizing graph...", CYAN) << std::endl;
+        //     //// 4. optimize with graph
+        //     high_resolution_clock::time_point t4 = high_resolution_clock::now();
+        //     // m_corrected_esti = gtsam::LevenbergMarquardtOptimizer(m_gtsam_graph, init_esti_).optimize(); // cf. isam.update vs values.LM.optimize
+        //     {
+        //         std::lock_guard<std::mutex> lock(graph_mutex_);
+        //         std::cout << colorize("Updating ISAM2 with " + std::to_string(gtsam_graph_.size()) + " new factors...", YELLOW) << std::endl;
+        //         isam_handler_->update(gtsam_graph_, init_esti_);
+        //         std::cout << colorize("Graph size: " + std::to_string(isam_handler_->getFactorsUnsafe().size()) + " factors, " +
+        //                                 std::to_string(isam_handler_->getLinearizationPoint().size()) + " values.", YELLOW) << std::endl;
+        //         isam_handler_->update();
+        //         if (loop_added_flag_) // https://github.com/TixiaoShan/LIO-SAM/issues/5#issuecomment-653752936
+        //         {
+        //             isam_handler_->update();
+        //             isam_handler_->update();
+        //             isam_handler_->update();
+        //         }
+        //         std::cout << colorize("Optimization done.", GREEN) << std::endl;
+        //         gtsam_graph_.resize(0);
+        //         init_esti_.clear();
+        //     }
 
-            std::cout << colorize("Handling corrected results...", CYAN) << std::endl;
-            //// 5. handle corrected results
-            // get corrected poses and reset odom delta (for realtime pose pub)
-            high_resolution_clock::time_point t5 = high_resolution_clock::now();
-            {
-                std::lock_guard<std::mutex> lock(realtime_pose_mutex_);
-                corrected_esti_ = isam_handler_->calculateEstimate();
-                last_corrected_pose_ = gtsamPoseToPoseEig(corrected_esti_.at<gtsam::Pose3>(corrected_esti_.size() - 1));
-                pose_covariance_ = isam_handler_->marginalCovariance(corrected_esti_.size() - 1);
-                // std::cout << "Pose covariance: " << std::endl << pose_covariance_ << std::endl << std::endl;
-                odom_delta_ = Eigen::Matrix4d::Identity();
-            }
-            // correct poses in keyframes
-            if (loop_added_flag_)
-            {
-                std::lock_guard<std::mutex> lock(keyframes_mutex_);
-                for (size_t i = 0; i < corrected_esti_.size(); ++i)
-                {
-                    keyframes_[i].pose_corrected_eig_ = gtsamPoseToPoseEig(corrected_esti_.at<gtsam::Pose3>(i));
-                }
-                loop_added_flag_ = false;
-            }
-            high_resolution_clock::time_point t6 = high_resolution_clock::now();
+        //     std::cout << colorize("Handling corrected results...", CYAN) << std::endl;
+        //     //// 5. handle corrected results
+        //     // get corrected poses and reset odom delta (for realtime pose pub)
+        //     high_resolution_clock::time_point t5 = high_resolution_clock::now();
+        //     {
+        //         std::lock_guard<std::mutex> lock(realtime_pose_mutex_);
+        //         corrected_esti_ = isam_handler_->calculateEstimate();
+        //         last_corrected_pose_ = gtsamPoseToPoseEig(corrected_esti_.at<gtsam::Pose3>(corrected_esti_.size() - 1));
+        //         pose_covariance_ = isam_handler_->marginalCovariance(corrected_esti_.size() - 1);
+        //         // std::cout << "Pose covariance: " << std::endl << pose_covariance_ << std::endl << std::endl;
+        //         odom_delta_ = Eigen::Matrix4d::Identity();
+        //     }
+        //     // correct poses in keyframes
+        //     if (loop_added_flag_)
+        //     {
+        //         std::lock_guard<std::mutex> lock(keyframes_mutex_);
+        //         for (size_t i = 0; i < corrected_esti_.size(); ++i)
+        //         {
+        //             keyframes_[i].pose_corrected_eig_ = gtsamPoseToPoseEig(corrected_esti_.at<gtsam::Pose3>(i));
+        //         }
+        //         loop_added_flag_ = false;
+        //     }
+        //     high_resolution_clock::time_point t6 = high_resolution_clock::now();
 
-            ROS_INFO("real: %.1f, key_add: %.1f, vis: %.1f, opt: %.1f, res: %.1f, tot: %.1fms",
-                     duration_cast<microseconds>(t2 - t1).count() / 1e3,
-                     duration_cast<microseconds>(t3 - t2).count() / 1e3,
-                     duration_cast<microseconds>(t4 - t3).count() / 1e3,
-                     duration_cast<microseconds>(t5 - t4).count() / 1e3,
-                     duration_cast<microseconds>(t6 - t5).count() / 1e3,
-                     duration_cast<microseconds>(t6 - t1).count() / 1e3);
+        //     ROS_INFO("real: %.1f, key_add: %.1f, vis: %.1f, opt: %.1f, res: %.1f, tot: %.1fms",
+        //              duration_cast<microseconds>(t2 - t1).count() / 1e3,
+        //              duration_cast<microseconds>(t3 - t2).count() / 1e3,
+        //              duration_cast<microseconds>(t4 - t3).count() / 1e3,
+        //              duration_cast<microseconds>(t5 - t4).count() / 1e3,
+        //              duration_cast<microseconds>(t6 - t5).count() / 1e3,
+        //              duration_cast<microseconds>(t6 - t1).count() / 1e3);
         }
     }
 
@@ -846,7 +846,8 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
                                 << pose_(1, 2) << " " << pose_(1, 3) << " " << pose_(2, 0) << " "
                                 << pose_(2, 1) << " " << pose_(2, 2) << " " << pose_(2, 3) << "\n";
 
-                const auto &lidar_optim_pose_ = poseEigToPoseStamped(keyframes_[i].pose_corrected_eig_);
+                // const auto &lidar_optim_pose_ = poseEigToPoseStamped(keyframes_[i].pose_corrected_eig_);
+                const auto &lidar_optim_pose_ = poseEigToPoseStamped(keyframes_[i].pose_eig_);
                 // Convert ROS timestamp to human-readable format
                 std::string ts_readable = unixToReadableTimestamp(keyframes_[i].timestamp_);
 
@@ -916,7 +917,8 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
 
                 for (size_t i = 0; i < keyframes_.size(); ++i)
                 {
-                    *chunk_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
+                    // *chunk_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
+                    *chunk_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_eig_);
 
                     // If reached chunk boundary or last keyframe, save this chunk
                     bool is_chunk_end = ((i + 1) % chunk_size == 0) || (i + 1 == keyframes_.size());
