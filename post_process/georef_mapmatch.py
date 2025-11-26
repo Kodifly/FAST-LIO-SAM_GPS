@@ -214,8 +214,8 @@ def save_alignment_parameters(scale, R, T, output_dir):
         f.write("# Alignment: P_gps = s * R * P_slam + T\n")
         f.write(f"scale: {scale:.8f}\n")
         f.write("rotation_matrix:\n")
-        f.write(f"   {R[0,0]: .8f} {R[0,1]: .8f}\n")
-        f.write(f"   {R[1,0]: .8f} {R[1,1]: .8f}\n")
+        f.write(f"  {R[0,0]: .8f} {R[0,1]: .8f}\n")
+        f.write(f"  {R[1,0]: .8f} {R[1,1]: .8f}\n")
         f.write(f"translation_vector: [{T[0]:.8f}, {T[1]:.8f}]\n")
     print(f"Saved alignment params: {path}")
 
