@@ -887,20 +887,16 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
 
     if (save_map_pcd_)
     {
+        // Save full map as a single PCD file (no chunking)
         high_resolution_clock::time_point t1 = high_resolution_clock::now();
-        ROS_INFO("\033[32;1mStart to save map\033[0m");
-        pcl::PointCloud<PointType> map_for_denoise;
+        ROS_INFO("\033[32;1mStart to save full map (single PCD)\033[0m");
 
-        // Save keyframes in chunks (e.g. every 100 keyframes -> one PCD)
-        const size_t chunk_size = 2000;
-        size_t chunk_idx = 0;
-
-        // ensure output directory exists
         if (!std::filesystem::exists(seq_directory))
         {
             std::filesystem::create_directories(seq_directory);
         }
 
+        pcl::PointCloud<PointType>::Ptr full_map(new pcl::PointCloud<PointType>());
         {
             std::lock_guard<std::mutex> lock(keyframes_mutex_);
             if (keyframes_.empty())
@@ -909,42 +905,34 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
             }
             else
             {
-                // Precompute approximate reserve size per chunk if possible
+                // Reserve approximate total size
                 size_t approx_per_kf = keyframes_[0].pcd_.size();
-
-                pcl::PointCloud<PointType>::Ptr chunk_map(new pcl::PointCloud<PointType>());
-                chunk_map->reserve(approx_per_kf * std::min(chunk_size, keyframes_.size()));
-
+                full_map->reserve(approx_per_kf * keyframes_.size());
                 for (size_t i = 0; i < keyframes_.size(); ++i)
                 {
-                    // *chunk_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
-                    *chunk_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_eig_);
-
-                    // If reached chunk boundary or last keyframe, save this chunk
-                    bool is_chunk_end = ((i + 1) % chunk_size == 0) || (i + 1 == keyframes_.size());
-                    if (is_chunk_end)
-                    {
-                        std::ostringstream ss;
-                        ss << seq_directory << "/" << seq_name_ << "_map_" << std::setw(4) << std::setfill('0') << chunk_idx << ".pcd";
-                        const std::string out_path = ss.str();
-
-                        // Optionally voxelize before saving (commented out)
-                        // const auto &voxelized_map = voxelizePcd(chunk_map, voxel_res_);
-                        // pcl::io::savePCDFileBinary<PointType>(out_path, *voxelized_map);
-
-                        pcl::io::savePCDFileBinary<PointType>(out_path, *chunk_map);
-                        ROS_INFO("\033[32;1mSaved chunk %s (size: %zu)\033[0m", out_path.c_str(), chunk_map->size());
-
-                        // prepare next chunk
-                        chunk_idx++;
-                        chunk_map->clear();
-                        chunk_map->reserve(approx_per_kf * std::min(chunk_size, keyframes_.size() - i - 1));
-                    }
+                    // use corrected pose if available
+                    // *full_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_corrected_eig_);
+                    *full_map += transformPcd(keyframes_[i].pcd_, keyframes_[i].pose_eig_);
                 }
             }
         }
 
-        ROS_INFO("\033[32;1mAccumulated map chunks saved in .pcd format\033[0m");
+        const std::string out_path = seq_directory + "/" + seq_name_ + "_map.pcd";
+        if (full_map->empty())
+        {
+            ROS_WARN("Full map is empty; saving empty PCD to %s", out_path.c_str());
+            pcl::PointCloud<PointType> empty;
+            pcl::io::savePCDFileBinary<PointType>(out_path, empty);
+        }
+        else
+        {
+            // Optional voxelization to reduce size
+            // const auto &voxelized_map = voxelizePcd(full_map, voxel_res_);
+            // pcl::io::savePCDFileBinary<PointType>(out_path, *voxelized_map);
+            pcl::io::savePCDFileBinary<PointType>(out_path, *full_map);
+            ROS_INFO("\033[32;1mSaved full map %s (points: %zu)\033[0m", out_path.c_str(), full_map->size());
+        }
+
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
         ROS_INFO("\033[36;1mMap saved: %.1fms\033[0m", duration_cast<microseconds>(t2 - t1).count() / 1e3);
     }
