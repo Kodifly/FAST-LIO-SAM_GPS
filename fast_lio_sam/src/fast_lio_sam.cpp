@@ -898,7 +898,8 @@ void FastLioSam::saveFlagCallback(const std_msgs::String::ConstPtr &msg)
         // denoise_slam_map(*corrected_map);
         // const auto &voxelized_map = voxelizePcd(corrected_map, voxel_res_);
         // pcl::io::savePCDFileASCII<PointType>(seq_directory + "/" + seq_name_ + "_map.pcd", *voxelized_map);
-        pcl::io::savePCDFileASCII<PointType>(seq_directory + "/" + seq_name_ + "_map.pcd", *corrected_map);
+        // pcl::io::savePCDFileASCII<PointType>(seq_directory + "/" + seq_name_ + "_map.pcd", *corrected_map);
+        pcl::io::savePCDFileBinary<PointType>(seq_directory + "/" + seq_name_ + "_map.pcd", *corrected_map);
         ROS_INFO("\033[32;1mAccumulated map cloud saved in .pcd format\033[0m");
         high_resolution_clock::time_point t2 = high_resolution_clock::now();
         ROS_INFO("\033[36;1mMap saved: %.1fms\033[0m", duration_cast<microseconds>(t2 - t1).count() / 1e3);
