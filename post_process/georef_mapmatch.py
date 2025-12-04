@@ -294,8 +294,8 @@ def run_map_matching(input_file, output_dir):
 
     base = os.path.splitext(os.path.basename(input_file))[0]
     output_txt = os.path.join(output_dir, f"{base}_snapped.txt")
-    output_html = os.path.join(output_dir, f"{base}_snapped_map.html")
-    manual_html = os.path.join(output_dir, f"{base}_manual_snapped_map.html")
+    output_html = os.path.join(output_dir, f"{base}_snapped.html")
+    manual_html = os.path.join(output_dir, f"{base}_snapped_manual.html")
 
     # Load trace
     df = pd.read_csv(input_file, sep=r'\s+', comment='#', names=["ts", "lat", "lon", "h"])
@@ -411,7 +411,7 @@ def main():
     if plot_steps:
         plot_only_georeferenced_slam(aligned_slam, gps_hk, output_dir)
 
-    create_gps_accuracy_map(gps_file, os.path.join(output_dir, "gps.html"))
+    create_gps_accuracy_map(gps_file, os.path.join(output_dir, "gps_data.html"))
     create_slam_map(geo_slam_file, os.path.join(output_dir, "slam_geo_referenced.html"))
 
     errors = np.linalg.norm(matched_gps - apply_transformation(matched_slam, scale, R, T), axis=1)
